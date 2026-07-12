@@ -12,7 +12,7 @@ const commentText = ref('')
 const replyTo = ref(null)  // { id, username } 正在回复的评论
 const replyText = ref('')
 const userId = ref(Number(localStorage.getItem('userId') || 0))
-const isAdmin = ref(Number(localStorage.getItem('role') || 0) === 1)
+const isAdmin = ref(Number(localStorage.getItem('role') || 0) >= 1)
 
 const statusMap = { 0: '草稿', 1: '待审核', 2: '已发布', 3: '已驳回' }
 
@@ -127,7 +127,7 @@ onMounted(() => { load(); loadComments() })
         <div v-if="article.coverUrl" style="text-align: center; margin-bottom: 20px">
           <img :src="article.coverUrl" style="max-width: 100%; max-height: 300px" alt="封面" />
         </div>
-        <div v-html="article.content" style="line-height: 1.8; min-height: 200px"></div>
+        <div class="article-body" v-html="article.content" style="line-height: 1.8; min-height: 200px"></div>
         <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; display: flex; align-items: center; justify-content: center; gap: 6px">
           <span @click="handleLike" style="cursor:pointer; font-size:28px; user-select:none; transition: transform 0.2s"
                 :style="{ color: userId ? '#f56c6c' : '#ccc' }"
@@ -189,3 +189,10 @@ onMounted(() => { load(); loadComments() })
     </el-col>
   </el-row>
 </template>
+
+<style scoped>
+.article-body img {
+  max-width: 100%;
+  height: auto;
+}
+</style>

@@ -1,6 +1,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { QuillEditor } from '@vueup/vue-quill'
+import '@vueup/vue-quill/dist/vue-quill.snow.css'
 import { articleAPI, categoryAPI, fileAPI } from '../api'
 import { ElMessage } from 'element-plus'
 
@@ -11,6 +13,30 @@ const categories = ref([])
 const loading = ref(false)
 const form = reactive({ title: '', summary: '', content: '', coverUrl: '', categoryId: null, draft: false })
 const uploading = ref(false)
+const quillRef = ref(null)
+
+// Quill 编辑器工具栏配置
+const editorOptions = {
+  modules: {
+    toolbar: {
+      container: [
+        [{ header: [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ color: [] }, { background: [] }],
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        ['blockquote', 'code-block'],
+        [{ align: [] }],
+        ['link', 'image'],
+        ['clean']
+      ],
+      handlers: {
+        image: null  // 在 onMounted 中绑定自定义 handler
+      }
+    }
+  },
+  placeholder: '写下你的文章内容...',
+  theme: 'snow'
+}
 
 async function loadCategories() {
   const res = await categoryAPI.list()
@@ -27,9 +53,10 @@ async function loadArticle() {
   })
 }
 
-async function handleUpload(e) {
-  const file = e.target.files?.[0] || e.raw
-  if (!file) return
+// 封面上传（el-upload）
+async function handleCoverUpload(uploadFile) {
+  const file = uploadFile.raw
+  if (!file) { ElMessage.error('文件读取失败，请重试'); return }
   const fd = new FormData()
   fd.append('file', file)
   uploading.value = true
@@ -39,6 +66,35 @@ async function handleUpload(e) {
     ElMessage.success('封面上传成功')
   } finally {
     uploading.value = false
+  }
+}
+
+// Quill 编辑器内的图片上传
+function createImageHandler(quillInstance) {
+  const input = document.createElement('input')
+  input.setAttribute('type', 'file')
+  input.setAttribute('accept', 'image/*')
+  input.addEventListener('change', async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const range = quillInstance.getSelection(true)
+      // 先显示加载占位
+      quillInstance.insertText(range.index, '上传中...', { color: '#999' }, 'user')
+      const res = await fileAPI.upload(fd)
+      // 删除占位文本
+      quillInstance.deleteText(range.index, 4, 'user')
+      // 插入上传后的图片
+      quillInstance.insertEmbed(range.index, 'image', res.data.fileUrl, 'user')
+      quillInstance.setSelection(range.index + 1)
+    } catch {
+      ElMessage.error('图片上传失败')
+    }
+  })
+  return function () {
+    input.click()
   }
 }
 
@@ -60,6 +116,14 @@ async function save(draft = false) {
     router.push('/')
   } finally {
     loading.value = false
+  }
+}
+
+// 编辑器就绪后绑定图片上传 handler
+function onEditorReady(quillInstance) {
+  const toolbar = quillInstance.getModule('toolbar')
+  if (toolbar) {
+    toolbar.addHandler('image', createImageHandler(quillInstance))
   }
 }
 
@@ -87,7 +151,7 @@ onMounted(() => { loadCategories(); loadArticle() })
             :auto-upload="false"
             :show-file-list="false"
             accept="image/*"
-            @change="handleUpload"
+            @change="handleCoverUpload"
           >
             <el-button :loading="uploading">上传封面图片</el-button>
           </el-upload>
@@ -95,8 +159,16 @@ onMounted(() => { loadCategories(); loadArticle() })
         </div>
         <img v-if="form.coverUrl" :src="form.coverUrl" style="margin-top: 8px; max-height: 150px; border-radius: 4px; display: block" />
       </el-form-item>
-      <el-form-item label="正文">
-        <el-input v-model="form.content" type="textarea" :rows="15" placeholder="文章正文（支持 HTML）" />
+      <el-form-item label="正文" class="editor-form-item">
+        <div class="editor-wrapper">
+          <QuillEditor
+            ref="quillRef"
+            v-model:content="form.content"
+            :options="editorOptions"
+            content-type="html"
+            @ready="onEditorReady"
+          />
+        </div>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="loading" @click="save(false)">提交审核</el-button>
@@ -106,3 +178,31 @@ onMounted(() => { loadCategories(); loadArticle() })
     </el-form>
   </div>
 </template>
+
+<style scoped>
+.editor-form-item :deep(.el-form-item__content) {
+  display: block;
+}
+
+.editor-wrapper {
+  width: 100%;
+}
+
+.editor-wrapper :deep(.ql-toolbar) {
+  border-radius: 4px 4px 0 0;
+  border: 1px solid #ccc;
+}
+
+.editor-wrapper :deep(.ql-container) {
+  min-height: 400px;
+  border-radius: 0 0 4px 4px;
+  border: 1px solid #ccc;
+  border-top: 0;
+  font-size: 15px;
+}
+
+.editor-wrapper :deep(.ql-editor) {
+  min-height: 380px;
+  line-height: 1.8;
+}
+</style>

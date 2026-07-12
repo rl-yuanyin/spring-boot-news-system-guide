@@ -52,10 +52,17 @@ public final class UserContext {
     }
 
     /**
-     * 是否管理员
+     * 是否管理员（含超管）
      */
     public static boolean isAdmin() {
-        return getCurrentRole() != null && getCurrentRole() == 1;
+        return getCurrentRole() != null && getCurrentRole() >= 1;
+    }
+
+    /**
+     * 是否超级管理员
+     */
+    public static boolean isSuperAdmin() {
+        return getCurrentRole() != null && getCurrentRole() == 2;
     }
 
     /**

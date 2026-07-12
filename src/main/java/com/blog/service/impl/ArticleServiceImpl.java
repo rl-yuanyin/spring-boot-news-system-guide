@@ -417,6 +417,73 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     }
 
     @Override
+    public PageResult<ArticleVO> pageAll(ArticleQueryDTO dto) {
+        LambdaQueryWrapper<Article> wrapper = new LambdaQueryWrapper<>();
+
+        // 排除草稿（状态 0），其余全部显示
+        wrapper.ne(Article::getStatus, Constants.ARTICLE_STATUS_DRAFT);
+
+        // 关键词搜索
+        if (StringUtils.hasText(dto.getKeyword())) {
+            List<Long> matchedUserIds = userMapper.selectList(
+                new LambdaQueryWrapper<User>().like(User::getNickname, dto.getKeyword())
+            ).stream().map(User::getId).toList();
+            wrapper.and(w -> w
+                .like(Article::getTitle, dto.getKeyword())
+                .or(!matchedUserIds.isEmpty(), w2 -> w2.in(Article::getUserId, matchedUserIds)));
+        }
+
+        if (dto.getCategoryId() != null) {
+            wrapper.eq(Article::getCategoryId, dto.getCategoryId());
+        }
+
+        wrapper.orderByDesc(Article::getCreateTime);
+
+        Page<Article> page = new Page<>(dto.getPage(), dto.getPageSize());
+        page = page(page, wrapper);
+
+        if (page.getRecords().isEmpty()) {
+            return PageResult.of(page, List.of());
+        }
+
+        return buildVOPage(page);
+    }
+
+    /**
+     * 将 Article 分页结果批量转换为 VO（复用代码）
+     */
+    private PageResult<ArticleVO> buildVOPage(Page<Article> page) {
+        Set<Long> categoryIds = page.getRecords().stream()
+                .map(Article::getCategoryId).collect(Collectors.toSet());
+        Set<Long> userIds = page.getRecords().stream()
+                .map(Article::getUserId).collect(Collectors.toSet());
+
+        Map<Long, String> categoryNameMap = categoryMapper.selectBatchIds(categoryIds).stream()
+                .collect(Collectors.toMap(Category::getId, Category::getName));
+        Map<Long, String> userNameMap = userMapper.selectBatchIds(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getNickname, (a, b) -> a));
+
+        var voList = page.getRecords().stream().map(a -> ArticleVO.builder()
+                .id(a.getId())
+                .title(a.getTitle())
+                .summary(a.getSummary())
+                .coverUrl(a.getCoverUrl())
+                .categoryId(a.getCategoryId())
+                .categoryName(categoryNameMap.getOrDefault(a.getCategoryId(), "未知"))
+                .userId(a.getUserId())
+                .authorName(userNameMap.getOrDefault(a.getUserId(), "未知"))
+                .status(a.getStatus())
+                .viewCount(a.getViewCount())
+                .likeCount(a.getLikeCount())
+                .isTop(a.getIsTop())
+                .createTime(a.getCreateTime())
+                .updateTime(a.getUpdateTime())
+                .build()).collect(Collectors.toList());
+
+        return PageResult.of(page, voList);
+    }
+
+    @Override
     public boolean toggleLike(Long id, Long userId) {
         Article article = getById(id);
         if (article == null) {

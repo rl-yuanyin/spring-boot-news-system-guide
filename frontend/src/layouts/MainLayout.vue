@@ -11,7 +11,8 @@ const role = ref(Number(localStorage.getItem('role') || 0))
 const unreadCount = ref(0)
 
 const isLoggedIn = computed(() => !!token.value)
-const isAdmin = computed(() => role.value === 1)
+const isAdmin = computed(() => role.value >= 1)
+const isSuperAdmin = computed(() => role.value === 2)
 
 async function loadUnread() {
   if (!token.value) return
@@ -54,8 +55,10 @@ setInterval(loadUnread, 30000)
           @select="(key) => router.push(key)"
         >
           <el-menu-item index="/">首页</el-menu-item>
-          <el-menu-item v-if="isAdmin" index="/admin/review">文章审核</el-menu-item>
+          <el-menu-item v-if="isAdmin" index="/admin/review">文章管理</el-menu-item>
           <el-menu-item v-if="isAdmin" index="/admin/categories">分类管理</el-menu-item>
+          <el-menu-item v-if="isAdmin" index="/admin/users">用户管理</el-menu-item>
+          <el-menu-item v-if="isAdmin" index="/admin/applications">审核管理</el-menu-item>
         </el-menu>
       </div>
       <div style="display: flex; align-items: center; gap: 15px">

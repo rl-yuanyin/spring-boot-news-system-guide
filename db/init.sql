@@ -98,9 +98,9 @@ CREATE TABLE IF NOT EXISTS notification (
     INDEX idx_is_read (user_id, is_read)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='通知表';
 
--- 插入管理员账号（密码 123456 的 BCrypt 哈希）
+-- 插入超级管理员账号（密码 123456 的 BCrypt 哈希，role=2 为超级管理员）
 INSERT IGNORE INTO user (username, password, nickname, role, status) VALUES
-('admin', '$2a$10$j.kzj3sK9im6Tq/pNi.EQuyjfqF3dLTCG5wjG7GdtQThKxlfcFivG', '管理员', 1, 0);
+('admin', '$2a$10$j.kzj3sK9im6Tq/pNi.EQuyjfqF3dLTCG5wjG7GdtQThKxlfcFivG', '超级管理员', 2, 0);
 
 -- 插入默认分类
 INSERT IGNORE INTO category (id, name, sort, status) VALUES
@@ -109,3 +109,31 @@ INSERT IGNORE INTO category (id, name, sort, status) VALUES
 (3, '体育', 3, 0),
 (4, '教育', 4, 0),
 (5, '娱乐', 5, 0);
+
+-- 申诉表（被封禁用户提交申诉）
+CREATE TABLE IF NOT EXISTS appeal (
+    id          BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '申诉ID',
+    username    VARCHAR(50)  NOT NULL COMMENT '被封禁的用户名',
+    reason      VARCHAR(500) NOT NULL COMMENT '申诉理由',
+    status      TINYINT      DEFAULT 0   COMMENT '0-待处理 1-已通过 2-已拒绝',
+    reply       VARCHAR(500) DEFAULT ''  COMMENT '管理员回复',
+    create_time DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_username (username),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='申诉表';
+
+-- 管理员申请表
+CREATE TABLE IF NOT EXISTS admin_apply (
+    id            BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '申请ID',
+    user_id       BIGINT       NOT NULL              COMMENT '申请人ID',
+    reason        VARCHAR(500) DEFAULT ''            COMMENT '申请理由',
+    article_count INT          DEFAULT 0             COMMENT '申请时的已发布文章数',
+    total_views   BIGINT       DEFAULT 0             COMMENT '申请时的总浏览量',
+    status        TINYINT      DEFAULT 0             COMMENT '0-待审核 1-已通过 2-已拒绝',
+    reply         VARCHAR(500) DEFAULT ''            COMMENT '管理员回复',
+    create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员申请表';

@@ -65,7 +65,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/files",            // GET 公开，写操作由 Controller 内 requireLogin 保护
                         "/api/files/**",          // 上传/删除 由 Controller 内 requireLogin 保护
                         "/api/notifications",    // 通知接口由 Controller 内 requireLogin 保护
-                        "/api/notifications/**"
+                        "/api/notifications/**",
+                        "/api/appeal",           // 申诉提交公开（被封禁用户无法登录）
+                        "/api/appeal/**",         // 申诉查询公开
+                        "/api/admin-apply",       // 管理员申请由 Controller 内 requireLogin 保护
+                        "/api/admin-apply/**"
                 );
     }
 }

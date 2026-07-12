@@ -53,7 +53,13 @@
       "Bash(tasklist *)",
       "Bash(powershell -Command \"Get-Process -Id 128576 | Select-Object Id, ProcessName, Path\")",
       "Bash(taskkill *)",
-      "Bash(powershell -Command \"Stop-Process -Id 128576 -Force\")"
+      "Bash(powershell -Command \"Stop-Process -Id 128576 -Force\")",
+      "Bash(mvn compile *)",
+      "Bash(npx vite *)",
+      "Bash(awk '{print $NF}')",
+      "Bash(xargs -r taskkill //F //PID)",
+      "Bash(mvn spring-boot:run -q)",
+      "Bash(mysql *)"
     ]
   }
 }

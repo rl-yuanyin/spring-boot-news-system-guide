@@ -27,7 +27,14 @@ const routes = [
       // 管理端
       { path: 'admin/review', name: 'AdminReview', component: () => import('../views/admin/Review.vue'), meta: { auth: true, admin: true } },
       { path: 'admin/categories', name: 'AdminCategories', component: () => import('../views/admin/Categories.vue'), meta: { auth: true, admin: true } },
+      { path: 'admin/users', name: 'AdminUsers', component: () => import('../views/admin/Users.vue'), meta: { auth: true, admin: true } },
+      { path: 'admin/applications', name: 'AdminApplications', component: () => import('../views/admin/Applications.vue'), meta: { auth: true, admin: true } },
     ]
+  },
+  {
+    path: '/banned',
+    name: 'Banned',
+    component: () => import('../views/Banned.vue'),
   },
 ]
 
@@ -41,7 +48,7 @@ router.beforeEach((to, from, next) => {
   const role = Number(localStorage.getItem('role') || 0)
 
   if (to.meta.auth && !token) return next('/login')
-  if (to.meta.admin && role !== 1) return next('/')
+  if (to.meta.admin && role < 1) return next('/')
   if (to.meta.guest && token) return next('/')
 
   next()

@@ -26,6 +26,12 @@ async function login() {
     localStorage.setItem('role', user.role)
     localStorage.setItem('userId', user.id)
     router.push('/')
+  } catch (err) {
+    const msg = err.response?.data?.message || ''
+    if (err.response?.data?.code === 403 && msg.includes('封禁')) {
+      sessionStorage.setItem('bannedUser', form.username)
+      router.push('/banned')
+    }
   } finally {
     loading.value = false
   }

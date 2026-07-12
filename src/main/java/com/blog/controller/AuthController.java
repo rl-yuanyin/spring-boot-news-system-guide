@@ -88,6 +88,34 @@ public class AuthController {
         return Result.success(userVO);
     }
 
+    @Operation(summary = "修改密码", description = "登录用户修改自己的密码")
+    @PutMapping("/password")
+    public Result<Void> changePassword(
+            @RequestParam String oldPassword,
+            @RequestParam String newPassword) {
+        Long userId = UserContext.getCurrentUserId();
+        if (userId == null) return Result.unauthorized("未登录");
+        userService.changePassword(userId, oldPassword, newPassword);
+        return Result.success("密码修改成功", null);
+    }
+
+    @Operation(summary = "更新个人信息", description = "修改昵称和邮箱")
+    @PutMapping("/profile")
+    public Result<Void> updateProfile(@RequestBody Map<String, String> body) {
+        Long userId = UserContext.getCurrentUserId();
+        if (userId == null) return Result.unauthorized("未登录");
+        userService.updateProfile(userId, body.get("nickname"), body.get("email"));
+        return Result.success("个人信息已更新", null);
+    }
+
+    @Operation(summary = "用户统计", description = "获取当前用户的文章数和总浏览量")
+    @GetMapping("/stats")
+    public Result<Map<String, Object>> stats() {
+        Long userId = UserContext.getCurrentUserId();
+        if (userId == null) return Result.unauthorized("未登录");
+        return Result.success(userService.getUserStats(userId));
+    }
+
     @Operation(summary = "退出登录", description = "客户端清除 token 即可，服务端无需额外处理")
     @PostMapping("/logout")
     public Result<Void> logout() {

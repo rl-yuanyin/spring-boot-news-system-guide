@@ -10,8 +10,11 @@ import com.blog.entity.Article;
 import com.blog.exception.BusinessException;
 import com.blog.service.ArticleService;
 import com.blog.service.NotificationService;
+import com.blog.service.UserService;
 import com.blog.utils.JwtUtils;
 import com.blog.vo.ArticleVO;
+import com.blog.vo.UserVO;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -45,6 +48,7 @@ public class AdminController {
 
     private final ArticleService articleService;
     private final NotificationService notificationService;
+    private final UserService userService;
     private final JwtUtils jwtUtils;
 
     // ========================================
@@ -56,6 +60,13 @@ public class AdminController {
     public Result<PageResult<ArticleVO>> pending(ArticleQueryDTO dto) {
         checkAdmin();
         return Result.success(articleService.pagePending(dto));
+    }
+
+    @Operation(summary = "查询全部文章（管理端）", description = "管理员查询所有非草稿文章，支持分页和筛选")
+    @GetMapping("/articles/all")
+    public Result<PageResult<ArticleVO>> all(ArticleQueryDTO dto) {
+        checkAdmin();
+        return Result.success(articleService.pageAll(dto));
     }
 
     @Operation(summary = "审核通过", description = "管理员通过文章审核，文章状态变为已发布")
@@ -91,16 +102,16 @@ public class AdminController {
     // 数据导出
     // ========================================
 
-    @Operation(summary = "导出文章 Excel", description = "管理员导出文章数据为 Excel 文件，支持按时间范围筛选")
+    @Operation(summary = "导出文章 Excel", description = "管理员导出所有非草稿文章数据为 Excel 文件")
     @GetMapping("/articles/export")
     public void export(HttpServletResponse response) throws IOException {
         checkAdmin();
 
-        // 查询所有已发布文章
+        // 查询所有非草稿文章（待审核+已发布+已驳回）
         ArticleQueryDTO dto = new ArticleQueryDTO();
         dto.setPage(1);
         dto.setPageSize(10000); // 一次最多导出 10000 条
-        List<ArticleVO> articles = articleService.pageQuery(dto, null).getList();
+        List<ArticleVO> articles = articleService.pageAll(dto).getList();
 
         // 创建 Excel 工作簿
         Workbook workbook = new XSSFWorkbook();
@@ -155,11 +166,57 @@ public class AdminController {
     }
 
     // ========================================
+    // 用户管理
+    // ========================================
+
+    @Operation(summary = "用户列表", description = "管理员查看所有用户，分页")
+    @GetMapping("/users")
+    public Result<Page<UserVO>> users(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int pageSize) {
+        checkAdmin();
+        return Result.success(userService.listUsers(page, pageSize));
+    }
+
+    @Operation(summary = "切换用户状态", description = "管理员启用/禁用用户")
+    @PutMapping("/users/{id}/toggle-status")
+    public Result<Void> toggleUserStatus(@PathVariable Long id) {
+        int operatorRole = getCurrentRole();
+        userService.toggleUserStatus(id, operatorRole);
+        return Result.success("操作成功", null);
+    }
+
+    @Operation(summary = "任命管理员", description = "超管将用户提升为管理员")
+    @PutMapping("/users/{id}/promote")
+    public Result<Void> promote(@PathVariable Long id) {
+        checkSuperAdmin();
+        userService.setUserRole(id, Constants.ROLE_ADMIN);
+        return Result.success("已任命为管理员", null);
+    }
+
+    @Operation(summary = "撤职管理员", description = "超管将管理员降为普通用户")
+    @PutMapping("/users/{id}/demote")
+    public Result<Void> demote(@PathVariable Long id) {
+        checkSuperAdmin();
+        userService.setUserRole(id, Constants.ROLE_USER);
+        return Result.success("已撤职", null);
+    }
+
+    /**
+     * 从当前请求中获取操作者角色
+     */
+    private int getCurrentRole() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        String token = attrs.getRequest().getHeader("Authorization").substring(7);
+        return jwtUtils.getRole(token);
+    }
+
+    // ========================================
     // 权限辅助
     // ========================================
 
     /**
-     * 校验管理员权限，返回管理员 ID
+     * 校验管理员权限（含超管），返回管理员 ID
      */
     private Long checkAndGetAdminId() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -170,29 +227,37 @@ public class AdminController {
         String token = authHeader.substring(7);
         if (!jwtUtils.validateToken(token))
             throw BusinessException.unauthorized("token 无效或已过期");
-        if (jwtUtils.getRole(token) != 1)
+        int role = jwtUtils.getRole(token);
+        if (role < 1)
             throw BusinessException.forbidden("仅管理员可操作");
         return jwtUtils.getUserId(token);
     }
 
     /**
-     * 校验管理员权限
+     * 校验管理员权限（含超管）
      */
     private void checkAdmin() {
         ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs == null) {
-            throw BusinessException.unauthorized("请先登录");
-        }
+        if (attrs == null) throw BusinessException.unauthorized("请先登录");
         String authHeader = attrs.getRequest().getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith("Bearer "))
             throw BusinessException.unauthorized("请先登录");
-        }
         String token = authHeader.substring(7);
-        if (!jwtUtils.validateToken(token)) {
+        if (!jwtUtils.validateToken(token))
             throw BusinessException.unauthorized("token 无效或已过期");
-        }
-        if (jwtUtils.getRole(token) != 1) {
+        int role = jwtUtils.getRole(token);
+        if (role < 1)
             throw BusinessException.forbidden("仅管理员可操作");
-        }
+    }
+
+    /**
+     * 校验超级管理员权限（仅 role=2）
+     */
+    private void checkSuperAdmin() {
+        checkAdmin(); // 先校验登录
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        String token = attrs.getRequest().getHeader("Authorization").substring(7);
+        if (jwtUtils.getRole(token) != 2)
+            throw BusinessException.forbidden("仅超级管理员可操作");
     }
 }

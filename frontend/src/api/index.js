@@ -55,6 +55,7 @@ export const articleAPI = {
 // ===== 管理员 =====
 export const adminAPI = {
   pending: (params) => http.get('/admin/articles/pending', { params }),
+  all: (params) => http.get('/admin/articles/all', { params }),
   approve: (id) => http.post(`/admin/articles/${id}/approve`),
   reject: (id, reason) => http.post(`/admin/articles/${id}/reject`, { reason }),
   exportExcel: () => http.get('/admin/articles/export', { responseType: 'blob' }),
@@ -78,6 +79,34 @@ export const notifyAPI = {
 // ===== 管理员删文 =====
 export const adminArticleAPI = {
   deleteWithReason: (id, reason) => http.post(`/admin/articles/${id}/delete`, { reason }),
+}
+
+// ===== 管理员用户管理 =====
+export const adminUserAPI = {
+  list: (params) => http.get('/admin/users', { params }),
+  toggleStatus: (id) => http.put(`/admin/users/${id}/toggle-status`),
+  promote: (id) => http.put(`/admin/users/${id}/promote`),
+  demote: (id) => http.put(`/admin/users/${id}/demote`),
+}
+
+// ===== 管理员申请 =====
+export const applyAPI = {
+  submit: (reason) => http.post('/admin-apply', { reason }),
+  my: () => http.get('/admin-apply/my'),
+}
+
+// ===== 申诉 =====
+export const appealAPI = {
+  submit: (username, reason) => http.post('/appeal', { username, reason }),
+  my: (username) => http.get(`/appeal/${username}`),
+}
+
+// ===== 修改密码 =====
+export const userAPI = {
+  changePassword: (oldPassword, newPassword) =>
+    http.put('/auth/password', null, { params: { oldPassword, newPassword } }),
+  updateProfile: (data) => http.put('/auth/profile', data),
+  getStats: () => http.get('/auth/stats'),
 }
 
 // ===== 文件 =====

@@ -92,6 +92,11 @@ public interface ArticleService extends IService<Article> {
     List<ArticleVO> getHotArticles(int limit);
 
     /**
+     * 管理员查询所有非草稿文章（status != 0），分页
+     */
+    PageResult<ArticleVO> pageAll(ArticleQueryDTO dto);
+
+    /**
      * 点赞/取消点赞
      *
      * @param id     文章 ID

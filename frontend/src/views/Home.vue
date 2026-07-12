@@ -100,20 +100,30 @@ onMounted(() => {
 
       <!-- 文章列表 -->
       <el-card v-for="a in articles" :key="a.id" style="margin-bottom: 12px; cursor: pointer" @click="goDetail(a.id)" shadow="hover">
-        <template #header>
-          <div style="display: flex; justify-content: space-between; align-items: center">
-            <span style="font-size: 18px; font-weight: bold">{{ a.title }}</span>
-            <el-tag v-if="a.isTop" type="danger" size="small">置顶</el-tag>
+        <div style="display: flex; gap: 16px">
+          <!-- 封面图缩略图 -->
+          <div style="width: 160px; height: 100px; flex-shrink: 0; border-radius: 4px; overflow: hidden; background: #f5f5f5; display: flex; align-items: center; justify-content: center">
+            <img v-if="a.coverUrl" :src="a.coverUrl" style="width: 100%; height: 100%; object-fit: cover" alt="" />
+            <span v-else style="font-size: 32px; color: #ccc">🖼</span>
           </div>
-        </template>
-        <p style="color: #666; margin-bottom: 12px">{{ a.summary || '（暂无简介）' }}</p>
-        <div style="display: flex; gap: 20px; color: #999; font-size: 13px; align-items: center">
-          <span>✍ {{ a.authorName }}</span>
-          <span>📂 {{ a.categoryName }}</span>
-          <span>👁 {{ a.viewCount }}</span>
-          <span style="cursor:pointer; user-select:none" @click.stop="handleLike(a)">{{ token ? '❤️' : '🤍' }} {{ a.likeCount }}</span>
-          <span>🕐 {{ a.createTime?.substring(0, 10) }}</span>
-          <el-tag v-if="a.status !== 2" :type="a.status === 0 ? 'info' : a.status === 1 ? 'warning' : 'danger'" size="small">{{ statusMap[a.status] }}</el-tag>
+          <!-- 文字信息 -->
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px">
+                <span style="font-size: 18px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ a.title }}</span>
+                <el-tag v-if="a.isTop" type="danger" size="small">置顶</el-tag>
+              </div>
+              <p style="color: #666; margin: 0 0 8px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden">{{ a.summary || '（暂无简介）' }}</p>
+            </div>
+            <div style="display: flex; gap: 16px; color: #999; font-size: 13px; align-items: center; flex-wrap: wrap">
+              <span>✍ {{ a.authorName }}</span>
+              <span>📂 {{ a.categoryName }}</span>
+              <span>👁 {{ a.viewCount }}</span>
+              <span style="cursor:pointer; user-select:none" @click.stop="handleLike(a)">{{ token ? '❤️' : '🤍' }} {{ a.likeCount }}</span>
+              <span>🕐 {{ a.createTime?.substring(0, 10) }}</span>
+              <el-tag v-if="a.status !== 2" :type="a.status === 0 ? 'info' : a.status === 1 ? 'warning' : 'danger'" size="small">{{ statusMap[a.status] }}</el-tag>
+            </div>
+          </div>
         </div>
       </el-card>
 

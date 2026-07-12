@@ -13,6 +13,8 @@ public final class Constants {
     public static final int ROLE_USER = 0;
     /** 管理员 */
     public static final int ROLE_ADMIN = 1;
+    /** 超级管理员 */
+    public static final int ROLE_SUPER_ADMIN = 2;
 
     // ========== 用户状态 ==========
     /** 正常 */
