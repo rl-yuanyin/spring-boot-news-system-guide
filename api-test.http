@@ -1,0 +1,357 @@
+### ==========================================
+### 新闻内容管理系统 — API 集成测试
+###
+### 使用流程：
+###   1. 执行"0.获取验证码" → 验证码变量自动保存
+###   2. 执行"1.登录" → token 自动存入全局变量 {{token}}
+###   3. 后续接口自动携带 token，按编号顺序执行
+###   4. token 过期时重新执行步骤 0-1
+### ==========================================
+
+### ==========================================
+### 0. 获取验证码（Redis 版，返回 captchaKey + captchaCode）
+GET http://localhost:8080/api/auth/captcha
+
+> {%
+  client.global.set("captchaKey", response.body.data.captchaKey);
+  client.global.set("captchaCode", response.body.data.captchaCode);
+  client.log(">>> captchaKey: " + response.body.data.captchaKey);
+  client.log(">>> captchaCode: " + response.body.data.captchaCode);
+%}
+
+### 1. 登录（token 自动存入 {{token}}）
+### 可选参数：captchaKey, captcha（不传则跳过验证码）
+### ==========================================
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456"
+}
+
+> {%
+  client.global.set("token", response.body.data.token);
+  client.log(">>> Token 已自动保存，有效期 24 小时");
+%}
+
+### ==========================================
+### 2. 获取当前用户信息
+### ==========================================
+GET http://localhost:8080/api/auth/me
+Authorization: Bearer {{token}}
+
+### ==========================================
+### 第三阶段：分类管理
+### ==========================================
+
+### 3. 查询分类列表（公开）
+GET http://localhost:8080/api/categories
+
+### 4. 新增分类（管理员）
+POST http://localhost:8080/api/categories
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "军事",
+  "sort": 6
+}
+
+> {%
+  client.global.set("newCategoryId", response.body.data.id);
+  client.log(">>> 新增分类 ID: " + response.body.data.id);
+%}
+
+### 5. 修改分类（管理员）—— 使用上一步创建的分类 ID
+PUT http://localhost:8080/api/categories/{{newCategoryId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "军事观察",
+  "sort": 7
+}
+
+### 6. 删除分类（管理员）—— 使用步骤 4 创建的分类 ID
+DELETE http://localhost:8080/api/categories/{{newCategoryId}}
+Authorization: Bearer {{token}}
+
+### ==========================================
+### 第四阶段：文章管理
+### ==========================================
+
+### 7. 发布文章（提交审核，draft=false）
+POST http://localhost:8080/api/articles
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Spring Boot 入门教程",
+  "summary": "从零开始学习 Spring Boot",
+  "content": "<h1>Spring Boot 入门</h1><p>Spring Boot 是由 Pivotal 团队提供的全新框架...</p>",
+  "categoryId": 1,
+  "draft": false
+}
+
+> {%
+  client.global.set("publishedArticleId", response.body.data.id);
+  client.log(">>> 文章 ID: " + response.body.data.id);
+%}
+
+### 8. 保存草稿（draft=true）
+POST http://localhost:8080/api/articles
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Vue3 学习笔记（草稿）",
+  "summary": "Vue3 Composition API 笔记",
+  "content": "<p>Vue3 的 Composition API 提供了更灵活的代码组织方式...</p>",
+  "categoryId": 1,
+  "draft": true
+}
+
+> {%
+  client.global.set("draftArticleId", response.body.data.id);
+  client.log(">>> 草稿 ID: " + response.body.data.id);
+%}
+
+### 9. 分页查询文章列表（公开，默认只显示已发布）
+GET http://localhost:8080/api/articles?page=1&pageSize=10
+
+### 10. 按分类筛选文章
+GET http://localhost:8080/api/articles?categoryId=1&page=1&pageSize=10
+
+### 11. 按关键词搜索文章
+GET http://localhost:8080/api/articles?keyword=Spring&page=1&pageSize=10
+
+### 12. 查询文章详情（浏览量 +1）—— 使用步骤 7 创建的文章 ID
+GET http://localhost:8080/api/articles/{{publishedArticleId}}
+
+### 13. 修改文章（作者/管理员）
+PUT http://localhost:8080/api/articles/{{publishedArticleId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Spring Boot 进阶教程（已修改）",
+  "summary": "深入理解 Spring Boot 自动配置",
+  "content": "<h1>Spring Boot 进阶</h1><p>自动配置是 Spring Boot 的核心特性...</p>",
+  "categoryId": 1,
+  "draft": false
+}
+
+### 14. 提交审核（草稿 → 待审核）—— 使用步骤 8 创建的草稿 ID
+POST http://localhost:8080/api/articles/{{draftArticleId}}/submit
+Authorization: Bearer {{token}}
+
+### 15. 删除文章（作者/管理员）—— 使用步骤 8 的草稿 ID
+DELETE http://localhost:8080/api/articles/{{draftArticleId}}
+Authorization: Bearer {{token}}
+
+### ==========================================
+### 补充测试：权限校验
+### ==========================================
+
+### 16. 未登录尝试发布文章（应返回 401）
+POST http://localhost:8080/api/articles
+Content-Type: application/json
+
+{
+  "title": "No Auth Test",
+  "summary": "test",
+  "categoryId": 1,
+  "draft": false
+}
+
+### ==========================================
+### 第五阶段：文章审核
+### ==========================================
+
+### 17. 查询待审核文章列表
+GET http://localhost:8080/api/admin/articles/pending?page=1&pageSize=10
+Authorization: Bearer {{token}}
+
+### 18. 审核通过（管理员）
+POST http://localhost:8080/api/admin/articles/{{publishedArticleId}}/approve
+Authorization: Bearer {{token}}
+
+### 19. 审核驳回（管理员）
+POST http://localhost:8080/api/admin/articles/{{publishedArticleId}}/reject
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "reason": "内容涉及敏感话题，请修改后重新提交"
+}
+
+### 20. 普通用户尝试审核文章（应返回 403）
+POST http://localhost:8080/api/admin/articles/1/approve
+Authorization: Bearer {{token}}
+
+### ==========================================
+### 附加：注册新用户并测试普通用户权限
+### ==========================================
+
+### 21. 注册新用户
+POST http://localhost:8080/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "writer_test",
+  "password": "123456",
+  "nickname": "作家测试"
+}
+
+### 22. 普通用户登录（token 会覆盖 admin 的 token，之后可重新执行步骤 1 切回）
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "writer_test",
+  "password": "123456"
+}
+
+> {%
+  client.global.set("token", response.body.data.token);
+  client.log(">>> 已切换为普通用户 token");
+%}
+
+### 23. 普通用户尝试修改他人文章（应返回 403）
+PUT http://localhost:8080/api/articles/{{publishedArticleId}}
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "title": "Hacked Title",
+  "summary": "test",
+  "categoryId": 1,
+  "draft": false
+}
+
+### ==========================================
+### 第六阶段：评论功能
+### ==========================================
+
+### 24. 发布评论
+POST http://localhost:8080/api/comments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "articleId": {{publishedArticleId}},
+  "content": "写得真好，学习了！"
+}
+
+> {%
+  client.global.set("commentId", response.body.data.id);
+  client.log(">>> 评论 ID: " + response.body.data.id);
+%}
+
+### 25. 查询文章评论列表（公开）
+GET http://localhost:8080/api/articles/{{publishedArticleId}}/comments
+
+### 26. 发布第二条评论
+POST http://localhost:8080/api/comments
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "articleId": {{publishedArticleId}},
+  "content": "期待更多内容！"
+}
+
+### 27. 删除评论（自己的评论）
+DELETE http://localhost:8080/api/comments/{{commentId}}
+Authorization: Bearer {{token}}
+
+### 28. 未登录发布评论（应返回 401）
+POST http://localhost:8080/api/comments
+Content-Type: application/json
+
+{
+  "articleId": 1,
+  "content": "No auth test"
+}
+
+### ==========================================
+### 第七阶段：文件上传
+### multipart/form-data 上传，`< /path/to/your/image.png` 引用项目根目录测试图片
+### ==========================================
+
+### 29. 上传图片
+POST http://localhost:8080/api/files/upload
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="test-upload.png"
+Content-Type: image/png
+
+< /path/to/your/image.png
+--boundary--
+
+> {%
+  client.global.set("uploadedFileId", response.body.data.id);
+  client.global.set("uploadedFileUrl", response.body.data.fileUrl);
+  client.log(">>> 文件 URL: " + response.body.data.fileUrl);
+%}
+
+### 30. 查询文件列表
+GET http://localhost:8080/api/files
+
+### 31. 访问上传的图片（在浏览器中打开）
+GET http://localhost:8080{{uploadedFileUrl}}
+
+### 32. 删除文件
+DELETE http://localhost:8080/api/files/{{uploadedFileId}}
+Authorization: Bearer {{token}}
+
+### 33. 未登录上传（应返回 401）
+POST http://localhost:8080/api/files/upload
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="test.png"
+Content-Type: image/png
+
+< /path/to/your/image.png
+--boundary--
+
+### ==========================================
+### 第八阶段：Redis 验证码 & 热门文章
+### ==========================================
+
+### 34. 验证码登录（自动填入 captchaKey 和 captchaCode）
+POST http://localhost:8080/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "123456",
+  "captchaKey": "{{captchaKey}}",
+  "captcha": "{{captchaCode}}"
+}
+
+> {%
+  client.global.set("token", response.body.data.token);
+  client.log(">>> Token 已通过验证码登录刷新");
+%}
+
+### 35. 热门文章排行榜（基于 Redis ZSet 浏览量）
+GET http://localhost:8080/api/articles/hot?limit=5
+
+### 36. 查看文章详情（浏览量同步 Redis）
+GET http://localhost:8080/api/articles/{{publishedArticleId}}
+
+### 37. 热门文章排行
+GET http://localhost:8080/api/articles/hot?limit=5
+
+### ==========================================
+### 第九阶段：Excel 导出
+### ==========================================
+
+### 38. 导出文章 Excel（管理员，浏览器会下载文件）
+GET http://localhost:8080/api/admin/articles/export
+Authorization: Bearer {{token}}
